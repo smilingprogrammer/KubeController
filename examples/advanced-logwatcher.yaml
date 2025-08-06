@@ -1,0 +1,65 @@
+apiVersion: monitoring.kubecontroller.com/v1alpha1
+kind: LogWatcher
+metadata:
+  name: production-monitor
+  namespace: default
+spec:
+  podNamespace: production
+  podLabelSelector:
+    app: production-app
+  matchPattern: "OutOfMemoryError|ConnectionTimeout|DatabaseConnectionFailed"
+  actions:
+    restartPod: true
+    createJob:
+      jobTemplate: |
+        #!/bin/bash
+        echo "Critical error detected in production"
+        kubectl get pods -n production -l app=production-app
+        kubectl logs -n production -l app=production-app --tail=100
+        # Send additional notifications or run recovery scripts
+      timeout: 300
+      retries: 3
+    rollingUpdate:
+      deploymentName: production-app
+      maxUnavailable: 1
+      maxSurge: 1
+    cleanup:
+      timeout: 3600
+      resources:
+        - "jobs"
+        - "pods"
+  alerting:
+    slack:
+      webhookURL: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+      channel: "#production-alerts"
+      username: "LogWatcher"
+    email:
+      smtpHost: "smtp.gmail.com"
+      smtpPort: 587
+      username: "alerts@company.com"
+      password: "your-app-password"
+      from: "alerts@company.com"
+      to: "ops@company.com"
+      subject: "🚨 Critical Error Detected in Production"
+    webhook:
+      url: "https://api.company.com/incident-webhook"
+      method: "POST"
+      headers:
+        Authorization: "Bearer your-api-token"
+        Content-Type: "application/json"
+  scaling:
+    minReplicas: 3
+    maxReplicas: 15
+    scaleUpThreshold: 5
+    scaleDownThreshold: 1
+    deploymentName: production-app
+  annotations:
+    logwatcher.io/error-detected: "true"
+    logwatcher.io/last-error-time: "{{.Timestamp}}"
+    logwatcher.io/error-count: "{{.Count}}"
+  metrics:
+    enabled: true
+    port: 8080
+    path: "/metrics"
+  reconcileInterval: 60
+  tailLines: 200 

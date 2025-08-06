@@ -1,0 +1,14 @@
+apiVersion: monitoring.kubecontroller.com/v1alpha1
+kind: LogWatcher
+metadata:
+  name: basic-error-monitor
+  namespace: default
+spec:
+  podNamespace: default
+  podLabelSelector:
+    app: myapp
+  matchPattern: "ERROR|FATAL|Exception"
+  actions:
+    restartPod: true
+  reconcileInterval: 30
+  tailLines: 100 
